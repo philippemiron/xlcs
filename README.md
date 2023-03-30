@@ -9,25 +9,21 @@
 ## Summary
 python package to generate Lagrangian Coherent Structures from a collection of methods
 
-The package consumes and outputs [xarray](https://github.com/pydata/xarray) Datasets and uses [OceanParcels](https://github.com/oceanparcels/parcels/) to calculate trajectories.
-
-The goal of the package is to make it has easy as possible to calculate Lagrangian Coherent Structures any velocity fields that can be loaded into an `xarray.Dataset()`.
-
+The goal of the package is to make it has easy as possible to calculate Lagrangian Coherent Structures any velocity fields that can be loaded into an [xarray](https://github.com/pydata/xarray) datasets. The package consumes and outputs `xr.Dataset()` and `xr.DataArray()`, data structures of choice for geoscientists, and uses [OceanParcels](https://github.com/oceanparcels/parcels/) to efficiently calculate trajectories.
 
 ## Initial Release
 
-Coming to github very soon!
+Coming to github very soon! The initial release will include methods to calculate:
 
-The release will include methods to calculate:
+- Finite Time Lyapunov exponenent calculation ([G. Haller, 2001](https://www.sciencedirect.com/science/article/abs/pii/S0167278900001998))
+- Lagrangian averaged vorticity deviation ([G. Haller, A. Hadjighasem, M. Farazmand, and F. Huhn, 2016](http://www.georgehaller.com/reprints/LAVD.pdf))
+- Geodesic elliptic material vortices ([G. Haller and F.J. Beron-Vera, 2013; ](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/abs/coherent-lagrangian-vortices-the-black-holes-of-turbulence/3B50A4590B35E5637280F01A58502258), [D. Karrasch, F. Huhn, and G. Haller, 2015](https://royalsocietypublishing.org/doi/10.1098/rspa.2014.0639))
 
-- Finite Time Lyapunov exponenent calculation ([Haller 2001](https://www.sciencedirect.com/science/article/abs/pii/S0167278900001998))
-- Lagrangian averaged vorticity deviation ([G. Haller, A. Hadjighasem, M. Farazmand and F. Huhn ](http://www.georgehaller.com/reprints/LAVD.pdf))
-- Geodesic elliptic material vortices ([Haller & Beron 2013](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/abs/coherent-lagrangian-vortices-the-black-holes-of-turbulence/3B50A4590B35E5637280F01A58502258), [Karrasch, Huhn, and Haller, 2015](https://royalsocietypublishing.org/doi/10.1098/rspa.2014.0639))
-
-used for the identification of eddies in velocity fields.
+used for the identification of Lagrangian Coherent Eddies in oceanic flows.
 
 ## Getting started
 
+(Soon)
 
 ## Found an issue or need help?
 
