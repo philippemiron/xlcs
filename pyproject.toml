@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xlcs"
+version = "0.0.1"
+authors = [
+  { name="Philippe Miron", email="philippemiron@gmail.com" },
+]
+description = "python package to generate Lagrangian Coherent Structures from a collection of methods"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+]
+
+[project.urls]
+Homepage = ""
+Documentation = ""
