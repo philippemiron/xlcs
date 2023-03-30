@@ -1,0 +1,19 @@
+name: xlcs
+channels:
+    - https://conda.anaconda.org/conda-forge
+dependencies:
+    - cartopy
+    - cmocean
+    - gsw
+    - ipykernel
+    - matplotlib
+    - numba
+    - numpy
+    - parcels
+    - scikit-image
+    - scikit-learn
+    - scipy
+    - xarray
+    - xgcm
+    - zarr
+    - zlib
