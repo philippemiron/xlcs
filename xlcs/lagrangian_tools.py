@@ -73,7 +73,7 @@ def flowmap(
     mx, my = np.meshgrid(x, y, indexing="ij")
     # time can be datetime or seconds from the origin_time
     if type(t0) == datetime:
-        mt = np.full_like(mx, t0, dtype='datetime64[ms]')
+        mt = np.full_like(mx, t0, dtype="datetime64[ms]")
     else:
         mt = np.full_like(mx, t0)
 
@@ -175,7 +175,7 @@ def flowmap_lavd(
     mx, my = np.meshgrid(x, y)
     # time can be datetime or seconds from the origin_time
     if type(t0) == datetime:
-        mt = np.full_like(mx, t0, dtype='datetime64[ms]')
+        mt = np.full_like(mx, t0, dtype="datetime64[ms]")
     else:
         mt = np.full_like(mx, t0)
 

@@ -85,27 +85,27 @@ def extract_contours(
         print(
             f"{j+1}/{len(peaks_xy)} (Found {n} {'eddies' if n>1 else 'eddy'})", end="\r"
         )
-        
+
         # current peak and subdomain indices
         pxy = peaks_xy[j]
-        i0, i1 = pxy[0] - np.ceil(max_radius/dx), pxy[0] + np.ceil(max_radius/dx)
-        j0, j1 = pxy[1] - np.ceil(max_radius/dy), pxy[1] + np.ceil(max_radius/dy)
-        
+        i0, i1 = pxy[0] - np.ceil(max_radius / dx), pxy[0] + np.ceil(max_radius / dx)
+        j0, j1 = pxy[1] - np.ceil(max_radius / dy), pxy[1] + np.ceil(max_radius / dy)
+
         # make sure not over the domain
-        i0, i1 = max(0, int(i0)), min(len(lon)-1, int(i1))
-        j0, j1 = max(0, int(j0)), min(len(lat)-1, int(j1))
-        
+        i0, i1 = max(0, int(i0)), min(len(lon) - 1, int(i1))
+        j0, j1 = max(0, int(j0)), min(len(lat) - 1, int(j1))
+
         # lavd around the center
-        sub_lavd = lavd[slice(i0,i1), slice(j0,j1)]
+        sub_lavd = lavd[slice(i0, i1), slice(j0, j1)]
         sub_pxy = pxy - np.array([i0, j0])
-        
+
         c_levels = np.linspace(np.min(sub_lavd), peaks_value[j], number_levels)
 
         # loop from the lowest value to the peak value
-        #  - If we find a contour respecting the criteria 
+        #  - If we find a contour respecting the criteria
         #    we stop because we want to keep the largest
         for c_level in c_levels:
-            if contours[j] is None:              
+            if contours[j] is None:
                 # this also returns (i,j) indices
                 cs = find_contours(sub_lavd, c_level)
                 for c in cs:
@@ -116,12 +116,13 @@ def extract_contours(
                             if (
                                 abs(areaPoly - hull.volume) / areaPoly * 100 < defTol
                             ):  # in 2D hull.volume returns the area (!)
-                                
                                 # translate back to the full domain
-                                c[:,0] += i0
-                                c[:,1] += j0
-                                
-                                contours[j] = np.column_stack((flon(c[:, 0]), flat(c[:, 1])))
+                                c[:, 0] += i0
+                                c[:, 1] += j0
+
+                                contours[j] = np.column_stack(
+                                    (flon(c[:, 0]), flat(c[:, 1]))
+                                )
                                 n += 1
                                 break
                     except:

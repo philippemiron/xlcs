@@ -2,6 +2,7 @@ import numba as nb
 import numpy as np
 from typing import Tuple
 
+
 @nb.njit
 def haversine(
     lon1: np.array, lat1: np.array, lon2: np.array, lat2: np.array
