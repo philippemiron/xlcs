@@ -7,7 +7,7 @@
 [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fphilippemiron%2Fxlcs&count_bg=%232EE352&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=true)](https://hits.seeyoufarm.com)
 
 ## Summary
-python package to generate Lagrangian Coherent Structures from a collection of methods
+A collection of methods to generate Lagrangian Coherent Structures
 
 The goal of the package is to make it has easy as possible to calculate Lagrangian Coherent Structures any velocity fields that can be loaded into an [xarray](https://github.com/pydata/xarray) datasets. The package consumes and outputs `xr.Dataset()` and `xr.DataArray()`, data structures of choice for geoscientists, and uses [OceanParcels](https://github.com/oceanparcels/parcels/) to efficiently calculate trajectories.
 
