@@ -210,7 +210,7 @@ def lavd(ds, mean_vorticity, dt, origin_id, shape_p):
 
     # integration along the trajectory
     vorticity_deviation = np.trapz(
-        np.abs(np.ma.masked_invalid(ds.vorticity) - mean_vorticity), dx=dt
+        np.abs(np.nan_to_num(ds.vorticity) - mean_vorticity), dx=dt
     )
     value = np.zeros(shape_p)
     pid = (ds.trajectory.values - origin_id).astype("int")
