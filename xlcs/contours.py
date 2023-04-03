@@ -1,5 +1,6 @@
 import numba as nb
 import numpy as np
+import xarray as xr
 from typing import Tuple
 from scipy.interpolate import interp1d
 from skimage.feature import peak_local_max
@@ -45,9 +46,7 @@ def peaks_in_hull(p, hull, tol=1e-12):
 
 
 def extract_contours(
-    lon: np.array,
-    lat: np.array,
-    lavd: np.array,
+    ds: xr.Dataset,
     defTol: float = 0.075,
     max_radius: float = 3.0,
     number_levels: int = 50,
@@ -66,19 +65,18 @@ def extract_contours(
     Returns:
         peaks_xy: centers of extracted vortices [N, 2]
         contours: contours of extracted vortices [N, 2]
-
     """
 
     # peaks and data structures
-    peaks_xy = peak_local_max(lavd, min_distance=20)  # indices
-    peaks_value = lavd[peaks_xy[:, 0], peaks_xy[:, 1]]
+    peaks_xy = peak_local_max(ds["lavd"].values, min_distance=20)  # indices
+    peaks_value = ds["lavd"].values[peaks_xy[:, 0], peaks_xy[:, 1]]
     contours = np.empty_like(peaks_value, dtype="object")
 
+    dx, dy = np.mean(np.diff(ds["xc"].values)), np.mean(np.diff(ds["yc"].values))
     # coordinates are converted to indices by `find_contour`
     # this is used to bring back to degrees
-    dx, dy = np.mean(np.diff(lon)), np.mean(np.diff(lat))
-    flon = interp1d(np.arange(0, len(lon)), lon)
-    flat = interp1d(np.arange(0, len(lat)), lat)
+    flon = interp1d(np.arange(0, len(ds["xc"].values)), ds["xc"].values)
+    flat = interp1d(np.arange(0, len(ds["yc"].values)), ds["yc"].values)
 
     n = 0  # only for counting
     for j in range(0, len(peaks_xy)):
@@ -88,15 +86,15 @@ def extract_contours(
 
         # current peak and subdomain indices
         pxy = peaks_xy[j]
-        i0, i1 = pxy[0] - np.ceil(max_radius / dx), pxy[0] + np.ceil(max_radius / dx)
-        j0, j1 = pxy[1] - np.ceil(max_radius / dy), pxy[1] + np.ceil(max_radius / dy)
+        i0, i1 = pxy[0] - np.ceil(max_radius / dy), pxy[0] + np.ceil(max_radius / dy)
+        j0, j1 = pxy[1] - np.ceil(max_radius / dx), pxy[1] + np.ceil(max_radius / dx)
 
         # make sure not over the domain
-        i0, i1 = max(0, int(i0)), min(len(lon) - 1, int(i1))
-        j0, j1 = max(0, int(j0)), min(len(lat) - 1, int(j1))
+        i0, i1 = max(0, int(i0)), min(ds.dims["yc"] - 1, int(i1))
+        j0, j1 = max(0, int(j0)), min(ds.dims["xc"] - 1, int(j1))
 
         # lavd around the center
-        sub_lavd = lavd[slice(i0, i1), slice(j0, j1)]
+        sub_lavd = ds["lavd"].values[slice(i0, i1), slice(j0, j1)]
         sub_pxy = pxy - np.array([i0, j0])
 
         c_levels = np.linspace(np.min(sub_lavd), peaks_value[j], number_levels)
@@ -121,7 +119,7 @@ def extract_contours(
                                 c[:, 1] += j0
 
                                 contours[j] = np.column_stack(
-                                    (flon(c[:, 0]), flat(c[:, 1]))
+                                    (flat(c[:, 0]), flon(c[:, 1]))
                                 )
                                 n += 1
                                 break

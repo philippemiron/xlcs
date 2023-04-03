@@ -1,164 +1,31 @@
 from typing import Tuple, Any
-import math
 import numpy as np
 import xarray as xr
 import numba as nb
+from math import isnan
 from numpy import ndarray
 from xarray import Dataset
 import grid_calc
 from datetime import datetime, timedelta
-
-from parcels import (
-    FieldSet,
-    ParticleSet,
-    JITParticle,
-    AdvectionRK4,
-    ErrorCode,
-    Variable,
-)
-
-
-def DeleteParticle(particle, fieldset, time):
-    """
-    Remove particles that go out of bound
-
-    Args:
-        particle: object that defines custom particle
-        fieldset: parcels.fieldset.FieldSet object to track this particle on
-        time: current time
-    """
-    particle.delete()
-
-
-def RemoveOnLand(particle, fieldset, time):
-    """
-    Kernel to remove initial particles where there is no velocity.
-    This kernel is execute once before the regular advection.
-
-    Args:
-        particle: object that defines custom particle
-        fieldset: parcels.fieldset.FieldSet object to track this particle on
-        time: current time
-    """
-    u, v = fieldset.UV[time, particle.depth, particle.lat, particle.lon]
-    if math.fabs(u) < 1e-12:
-        particle.delete()
+from kernels import RemoveOnLand, DeleteParticle, SampleVorticity
+from particle import LAVDParticle
+import xgcm
+import gsw
+from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4, ErrorCode
+from typing import Optional
 
 
 def flowmap(
+    ds: Dataset,
     filename: str,
     fs: FieldSet,
-    x: np.array,
-    y: np.array,
     t0: datetime,
     T: timedelta,
     dt: timedelta,
-) -> Tuple[Any, ndarray, Dataset]:
+    lavd: Optional[bool] = False,
+) -> Tuple[Any, ndarray]:
     """
-    Calculate the flowmap from T-long trajectories initialized a coordinates x-y.
-    Args:
-        filename: output filename
-        fs: parcels.fieldset.FieldSet object to track this particle on
-        x: list of initial meridional coordinates
-        y: list of initial zonal coordinates
-        t0: initial time
-        T: integration time
-        dt: integration timestep
-
-    Returns:
-        pset: particles id and final position
-        origin_id: the index of the first particle to reconstruct the 2d grid from 1d vector
-        Dataset: contains the flowmap at the initial locations of the particles
-    """
-    mx, my = np.meshgrid(x, y, indexing="ij")
-    # time can be datetime or seconds from the origin_time
-    if type(t0) == datetime:
-        mt = np.full_like(mx, t0, dtype="datetime64[ms]")
-    else:
-        mt = np.full_like(mx, t0)
-
-    # initialize the particles
-    pset = ParticleSet.from_list(
-        fieldset=fs,  # velocity field
-        pclass=JITParticle,  # type of particles
-        lon=mx.flatten(),  # release lon
-        lat=my.flatten(),  # release lat
-        time=mt.flatten(),  # release time
-    )
-
-    origin_id = np.copy(pset.id[0])  # copy first id
-
-    # remove particle on land
-    pset.execute(
-        RemoveOnLand, dt=0, recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle}
-    )
-
-    output_file = pset.ParticleFile(
-        name=filename, outputdt=timedelta(seconds=int(abs(dt.total_seconds())))
-    )
-
-    # integration
-    pset.execute(
-        pset.Kernel(AdvectionRK4),
-        runtime=T,
-        dt=dt,
-        output_file=output_file,
-        verbose_progress=True,
-        recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle},
-    )
-
-    # reshape flowmap to a two-dimensional grid
-    pid = pset.id - origin_id
-    phi_x = np.zeros_like(mx)
-    phi_y = np.zeros_like(mx)
-    phi_x[np.unravel_index(pid, mx.shape)] = pset.lon
-    phi_y[np.unravel_index(pid, mx.shape)] = pset.lat
-
-    return (
-        pset,
-        origin_id,
-        xr.Dataset(
-            data_vars=dict(
-                phi_x=(["XG", "YG"], phi_x),
-                phi_y=(["XG", "YG"], phi_y),
-            ),
-            coords=dict(
-                longitude=(["lon", "lat"], mx),
-                latitude=(["lon", "lat"], my),
-            ),
-            attrs=dict(description=f"Flowmap from {t0} with T = {T.days} days."),
-        ),
-    )
-
-
-# Custom particle and kernel to sample the vorticity along the trajectory
-class LAVDParticle(JITParticle):
-    """
-    Custom particles definition to interpolate vorticity along the trajectory
-    """
-
-    vorticity = Variable("vorticity", initial=0.0)
-
-
-def SampleVorticity(particle, fieldset, time):
-    particle.vorticity = fieldset.vorticity[
-        time, particle.depth, particle.lat, particle.lon
-    ]
-
-
-def flowmap_lavd(
-    filename: str,
-    fs: FieldSet,
-    x: np.array,
-    y: np.array,
-    t0: datetime,
-    T: timedelta,
-    dt: timedelta,
-) -> Tuple[Any, ndarray, Dataset]:
-    """
-    Calculate the flowmap from T-long trajectories initialized a coordinates x-y. Because we need to sample the
-    vorticity along the trajectories, this version of the flowmap uses a special Particle. Otherwise, it is similar
-    to the flowmap function part of this module.
+    Calculate the flowmap from T-long trajectories initialized a coordinates x-y. If we are calculating LAVD (lavd=True), we need to sample the vorticity along the trajectory. In this case, we assume that the FieldSet fs contains a vorticity field.
 
     Args:
         filename: output filename
@@ -168,11 +35,13 @@ def flowmap_lavd(
         t0: initial time
         T: integration time
         dt: integration timestep
+        lavd: if True, interpolate vorticity along the trajectory
 
     Returns:
+        ds: xarray.Dataset augmented with the flowmap information
 
     """
-    mx, my = np.meshgrid(x, y)
+    mx, my = np.meshgrid(ds.xc, ds.yc)
     # time can be datetime or seconds from the origin_time
     if type(t0) == datetime:
         mt = np.full_like(mx, t0, dtype="datetime64[ms]")
@@ -182,7 +51,7 @@ def flowmap_lavd(
     # initialize the particles
     pset = ParticleSet.from_list(
         fieldset=fs,  # velocity field
-        pclass=LAVDParticle,  # type of particles
+        pclass=LAVDParticle if lavd else JITParticle,  # type of particles
         lon=mx.flatten(),  # release lon
         lat=my.flatten(),  # release lat
         time=mt.flatten(),  # release time
@@ -195,12 +64,16 @@ def flowmap_lavd(
         RemoveOnLand, dt=0, recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle}
     )
 
+    # define the output file
     output_file = pset.ParticleFile(
         name=filename, outputdt=timedelta(seconds=int(abs(dt.total_seconds())))
     )
 
     # integration
-    kernels = pset.Kernel(SampleVorticity) + pset.Kernel(AdvectionRK4)
+    kernels = pset.Kernel(AdvectionRK4)
+    if lavd:
+        kernels += pset.Kernel(SampleVorticity)
+
     pset.execute(
         kernels,  # the kernels (define how particles move)
         runtime=T,  # the total length of the run
@@ -212,57 +85,51 @@ def flowmap_lavd(
 
     # reshape flowmap to a two-dimensional grid
     pid = pset.id - origin_id
-    phi_x = np.zeros_like(mx)
-    phi_y = np.zeros_like(mx)
-    phi_x[np.unravel_index(pid, mx.shape)] = pset.lon
-    phi_y[np.unravel_index(pid, mx.shape)] = pset.lat
+    ds["phi_x"] = (("yc", "xc"), np.zeros_like(mx))
+    ds["phi_y"] = (("yc", "xc"), np.zeros_like(mx))
+    ds["phi_x"].values[np.unravel_index(pid, mx.shape)] = pset.lon
+    ds["phi_y"].values[np.unravel_index(pid, mx.shape)] = pset.lat
+
+    # 0 are replace with nan
+    ds["phi_x"].values[np.where(ds["phi_x"] == 0)] = np.nan
+    ds["phi_y"].values[np.where(ds["phi_y"] == 0)] = np.nan
 
     return (
         pset,
         origin_id,
-        xr.Dataset(
-            data_vars=dict(
-                phi_x=(["YG", "XG"], phi_x),
-                phi_y=(["YG", "XG"], phi_y),
-            ),
-            coords=dict(
-                longitude=(["YG", "XG"], mx),
-                latitude=(["YG", "XG"], my),
-            ),
-            attrs=dict(description=f"Flowmap from {t0} with T = {T.days} days."),
-        ),
     )
 
 
-def cauchygreen(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Calculate the Cauchy-Green tensor from the flowmap
+def cauchygreen(ds: xr.Dataset, grid: xgcm.Grid):
+    """_summary_
+
     Args:
-        ds:
-
-    Returns:
-
+        ds (xr.Dataset): _description_
+        grid (xgcm.Grid): _description_
     """
-    # reference (lon, lat) to convert to meters
-    lon0 = np.min(ds.longitude.data)
-    lat0 = np.min(ds.latitude.data)
+    ds["phi_x_m"] = (
+        ("yc", "xg"),
+        gsw.distance(ds["phi_x"].data, ds["phi_y"].data, axis=1),
+    )
+    ds["phi_y_m"] = (
+        ("yg", "xc"),
+        gsw.distance(ds["phi_x"].data, ds["phi_y"].data, axis=0),
+    )
 
-    # convert the grid from [deg] to [m]
-    x_m, y_m = grid_calc.grid_to_m(ds.longitude.data, ds.latitude.data, lon0, lat0)
-    ds["x_m"] = (("lon", "lat"), x_m)
-    ds["y_m"] = (("lon", "lat"), y_m)
-    ds = ds.set_coords(["x_m", "y_m"])
-
-    # and the flowmap from [deg] to [m]
-    phi_x_m, phi_y_m = grid_calc.grid_to_m(ds.phi_x.data, ds.phi_y.data, lon0, lat0)
-    ds["phi_x_m"] = (("lon", "lat"), phi_x_m)
-    ds["phi_y_m"] = (("lon", "lat"), phi_y_m)
-
-    # flowmap derivatives
-    ds["phi_x_dx"] = (("lon", "lat"), grid_calc.diff_x(phi_x_m.data, ds["x_m"].data))
-    ds["phi_x_dy"] = (("lon", "lat"), grid_calc.diff_y(phi_x_m.data, ds["y_m"].data))
-    ds["phi_y_dx"] = (("lon", "lat"), grid_calc.diff_x(phi_y_m.data, ds["x_m"].data))
-    ds["phi_y_dy"] = (("lon", "lat"), grid_calc.diff_y(phi_y_m.data, ds["y_m"].data))
+    ds["phi_x_dx"] = grid.diff(ds["phi_x_m"], "X", boundary="extend") / ds.xc
+    ds["phi_x_dy"] = grid.interp(
+        grid.diff(ds["phi_x_m"], "Y", boundary="extend") / ds.yg,
+        ["X", "Y"],
+        to="center",
+        boundary="extend",
+    )
+    ds["phi_y_dx"] = grid.interp(
+        grid.diff(ds["phi_y_m"], "X", boundary="extend") / ds.xg,
+        ["X", "Y"],
+        to="center",
+        boundary="extend",
+    )
+    ds["phi_y_dy"] = grid.diff(ds["phi_y_m"], "Y", boundary="extend") / ds.yc
 
     # form the Cauchy-Green tensor
     cg_data = np.moveaxis(
@@ -281,8 +148,7 @@ def cauchygreen(ds: xr.Dataset) -> xr.Dataset:
         [2, 3],
         [0, 1],
     )
-    ds["cg"] = xr.DataArray(cg_data, dims=["lon", "lat", "dim", "dim"])
-    return ds
+    ds["cg"] = xr.DataArray(cg_data, dims=["yc", "xc", "dim", "dim"])
 
 
 @nb.njit(parallel=True)
@@ -328,7 +194,7 @@ def eigenspectrum(
 
 def lavd(ds, mean_vorticity, dt, origin_id, shape_p):
     """
-    Calculate the Lagrangian averaged vorticity deviation (LAVD) from the v
+    Calculate the Lagrangian averaged vorticity deviation (LAVD) from the trajectories output
     Args:
         ds:
         mean_vorticity:
