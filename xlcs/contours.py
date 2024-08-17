@@ -5,7 +5,7 @@ from typing import Tuple
 from scipy.interpolate import interp1d
 from skimage.feature import peak_local_max
 from skimage.measure import find_contours
-from scipy.spatial import ConvexHull, convex_hull_plot_2d
+from scipy.spatial import ConvexHull
 
 
 @nb.njit
@@ -123,7 +123,8 @@ def extract_contours(
                                 )
                                 n += 1
                                 break
-                    except:
+                    except Exception as e:
+                        print(e)
                         pass
 
     return peaks_xy, contours
