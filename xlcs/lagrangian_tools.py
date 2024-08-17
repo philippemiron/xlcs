@@ -2,16 +2,14 @@ from typing import Tuple, Any
 import numpy as np
 import xarray as xr
 import numba as nb
-from math import isnan
 from numpy import ndarray
 from xarray import Dataset
-import grid_calc
 from datetime import datetime, timedelta
-from kernels import RemoveOnLand, DeleteParticle, SampleVorticity
+from kernels import OutOfBound, SampleVorticity
 from particle import LAVDParticle
 import xgcm
 import gsw
-from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4, ErrorCode
+from parcels import FieldSet, ParticleSet, JITParticle, AdvectionRK4
 from typing import Optional
 
 
@@ -43,7 +41,7 @@ def flowmap(
     """
     mx, my = np.meshgrid(ds.xc, ds.yc)
     # time can be datetime or seconds from the origin_time
-    if type(t0) == datetime:
+    if isinstance(t0, datetime):
         mt = np.full_like(mx, t0, dtype="datetime64[ms]")
     else:
         mt = np.full_like(mx, t0)
@@ -59,18 +57,13 @@ def flowmap(
 
     origin_id = np.copy(pset.id[0])  # copy first id
 
-    # remove particle on land
-    pset.execute(
-        RemoveOnLand, dt=0, recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle}
-    )
-
     # define the output file
     output_file = pset.ParticleFile(
         name=filename, outputdt=timedelta(seconds=int(abs(dt.total_seconds())))
     )
 
     # integration
-    kernels = pset.Kernel(AdvectionRK4)
+    kernels = pset.Kernel(OutOfBound) + pset.Kernel(AdvectionRK4)
     if lavd:
         kernels += pset.Kernel(SampleVorticity)
 
@@ -80,7 +73,6 @@ def flowmap(
         dt=dt,  # the timestep of the kernel
         output_file=output_file,
         verbose_progress=True,
-        recovery={ErrorCode.ErrorOutOfBounds: DeleteParticle},
     )
 
     # reshape flowmap to a two-dimensional grid
