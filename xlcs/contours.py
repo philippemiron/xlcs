@@ -117,10 +117,12 @@ def extract_contours(
         if best is not None:
             best[:, 0] += i0
             best[:, 1] += j0
-            contours[j] = np.column_stack((
-                np.interp(best[:, 0], yc_idx, yc_arr),
-                np.interp(best[:, 1], xc_idx, xc_arr),
-            ))
+            contours[j] = np.column_stack(
+                (
+                    np.interp(best[:, 0], yc_idx, yc_arr),
+                    np.interp(best[:, 1], xc_idx, xc_arr),
+                )
+            )
             n += 1
 
     return peaks_xy, contours
