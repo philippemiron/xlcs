@@ -1,4 +1,4 @@
-name: Format & Lint
+name: Lint
 
 # Controls when the workflow will run
 on:
