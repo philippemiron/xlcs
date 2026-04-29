@@ -1,17 +1,14 @@
+"""Grid calculations for non-uniform finite differences and coordinate transforms."""
+
 import numba as nb
 import numpy as np
-from typing import Tuple
 
 
 @nb.njit
-def haversine(
-    lon1: np.array, lat1: np.array, lon2: np.array, lat2: np.array
-) -> np.array:
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees)
+def haversine(lon1: np.array, lat1: np.array, lon2: np.array, lat2: np.array) -> np.array:
+    """Calculate the great circle distance between two points on the earth.
 
-    All args must be of equal length.
+    All args must be of equal length. Coordinates in decimal degrees.
     """
     lon1, lat1 = np.radians(lon1), np.radians(lat1)
     lon2, lat2 = np.radians(lon2), np.radians(lat2)
@@ -21,29 +18,27 @@ def haversine(
 
     a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2.0) ** 2
 
-    # distance
     earthRadius = 6.371e6  # m
-    d = 2 * np.arcsin(np.sqrt(a)) * earthRadius  # km
+    d = 2 * np.arcsin(np.sqrt(a)) * earthRadius
     return d
 
 
 @nb.njit
 def grid_to_m(
     lon: np.ndarray, lat: np.ndarray, lon0: float, lat0: float
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Transform a rectilinear grids defined by two 1D vector for longitude and latitude
-    to meters
+) -> tuple[np.ndarray, np.ndarray]:
+    """Transform a rectilinear grid from degrees to meters.
 
     Args:
-        lon: meridional coordinates of the grid in degrees
-        lat: zonal coordinates of the grid in degrees
+        lon: zonal coordinates of the grid in degrees
+        lat: meridional coordinates of the grid in degrees
         lon0: reference longitude
         lat0: reference latitude
 
     Returns:
-        x: meridional coordinates of the grid in meters
-        y: zonal coordinates of the grid in meters
+        x: zonal coordinates of the grid in meters
+        y: meridional coordinates of the grid in meters
+
     """
     nx, ny = lon.shape
     x = np.zeros((nx, ny))
@@ -58,20 +53,18 @@ def grid_to_m(
 
 @nb.njit
 def nonUniDiff5(x, f, x0):
-    """
-    Implementation of the first derivative 5 points formula from:
-    Derivative formulae and errors for non-uniformly spaced points
-    by M.K. Bowen and Ronald Smith doi:10.1098/rspa.2004.1430
+    """Compute the first derivative using a 5-point non-uniform finite difference formula.
 
-    As the name indicate, the five points do not have to be on a
-    regular grid.
+    Implements the formula from: Derivative formulae and errors for non-uniformly
+    spaced points by M.K. Bowen and Ronald Smith doi:10.1098/rspa.2004.1430.
 
     Args:
-        x: sequence of 5 points
-        f: f(x) value of a function at x
-        x0: point where to evaluate the derivates
-    Return:
-        f'(x0): first derivative evaluate at x0
+        x: sequence of 5 stencil points
+        f: function values f(x) at each stencil point
+        x0: point at which to evaluate the derivative
+
+    Returns:
+        f'(x0): first derivative evaluated at x0
 
     """
     a1 = x[0] - x0
@@ -97,20 +90,18 @@ def nonUniDiff5(x, f, x0):
 
 @nb.njit
 def nonUniDiff3(x, f, x0):
-    """
-    Implementation of the first derivative 3 points formula from:
-    Derivative formulae and errors for non-uniformly spaced points
-    by M.K. Bowen and Ronald Smith doi:10.1098/rspa.2004.1430
+    """Compute the first derivative using a 3-point non-uniform finite difference formula.
 
-    As the name indicate, the five points do not have to be on a
-    regular grid.
+    Implements the formula from: Derivative formulae and errors for non-uniformly
+    spaced points by M.K. Bowen and Ronald Smith doi:10.1098/rspa.2004.1430.
 
     Args:
-        x: sequence of 5 points
-        f: f(x) value of a function at x
-        x0: point where to evaluate the derivates
-    Return:
-        f'(x0): first derivative evaluate at x0
+        x: sequence of 3 stencil points
+        f: function values f(x) at each stencil point
+        x0: point at which to evaluate the derivative
+
+    Returns:
+        f'(x0): first derivative evaluated at x0
 
     """
     a1 = x[0] - x0
@@ -127,13 +118,15 @@ def nonUniDiff3(x, f, x0):
 
 @nb.njit
 def diff_x(var: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """
-    First derivatives are calculated using 3 points using finite difference schemes that can be used on non-uniform grid
+    """Compute first derivatives along the zonal axis using a 3-point non-uniform scheme.
+
     Args:
-        var: variable to derivate [nx,ny]
-        x: zonal grid [nx,ny]
-    Return:
+        var: variable to differentiate [nx, ny]
+        x: zonal grid [nx, ny]
+
+    Returns:
         dx: first derivative of variable [nx, ny]
+
     """
     nx, ny = len(x), len(x[0])
     dx = np.zeros((nx, ny))
@@ -163,13 +156,15 @@ def diff_x(var: np.ndarray, x: np.ndarray) -> np.ndarray:
 
 @nb.njit
 def diff_y(var: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """
-    First derivatives are calculated using 5 points using finite difference schemes that can be used on non-uniform grid
+    """Compute first derivatives along the meridional axis using a 3-point non-uniform scheme.
+
     Args:
-        var: variable to derivate [nx,ny]
-        y: zonal grid [nx,ny]
-    Return:
+        var: variable to differentiate [nx, ny]
+        y: meridional grid [nx, ny]
+
+    Returns:
         dy: first derivative of variable [nx, ny]
+
     """
     nx, ny = len(y), len(y[0])
     dy = np.zeros((nx, ny))
@@ -183,7 +178,7 @@ def diff_y(var: np.ndarray, y: np.ndarray) -> np.ndarray:
         # Central diff
         for j in range(1, ny - 1):
             p = [y[i, j - 1], y[i, j], y[i, j + 1]]
-            f = [var[i, j - 2], var[i, j - 1], var[i, j], var[i, j + 1], var[i, j + 2]]
+            f = [var[i, j - 1], var[i, j], var[i, j + 1]]
             dy[i, j] = nonUniDiff3(p, f, y[i, j])
 
         # Backward diff
@@ -199,13 +194,15 @@ def diff_y(var: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 @nb.njit
 def diff_x_5p(var: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """
-    First derivatives are calculated using 5 points using finite difference schemes that can be used on non-uniform grid
+    """Compute first derivatives along the zonal axis using a 5-point non-uniform scheme.
+
     Args:
-        var: variable to derivate [nx,ny]
-        x: zonal grid [nx,ny]
-    Return:
+        var: variable to differentiate [nx, ny]
+        x: zonal grid [nx, ny]
+
+    Returns:
         dx: first derivative of variable [nx, ny]
+
     """
     nx, ny = len(x), len(x[0])
     dx = np.zeros((nx, ny))
@@ -251,13 +248,15 @@ def diff_x_5p(var: np.ndarray, x: np.ndarray) -> np.ndarray:
 
 @nb.njit
 def diff_y_5p(var: np.ndarray, y: np.ndarray) -> np.ndarray:
-    """
-    First derivatives are calculated using 5 points using finite difference schemes that can be used on non-uniform grid
+    """Compute first derivatives along the meridional axis using a 5-point non-uniform scheme.
+
     Args:
-        var: variable to derivate [nx,ny]
-        y: zonal grid [nx,ny]
-    Return:
+        var: variable to differentiate [nx, ny]
+        y: meridional grid [nx, ny]
+
+    Returns:
         dy: first derivative of variable [nx, ny]
+
     """
     nx, ny = len(y), len(y[0])
     dy = np.zeros((nx, ny))
@@ -303,9 +302,7 @@ def diff_y_5p(var: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 @nb.njit
 def vorticity(x: np.ndarray, y: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
-    """
-    Calculate vorticity for all velocity fields
-    """
+    """Calculate vorticity for all time steps in a velocity field."""
     x_m, y_m = grid_to_m(x, y, x[0, 0], y[0, 0])
     vort = np.zeros_like(u)
     for i in range(0, len(vort)):

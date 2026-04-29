@@ -1,15 +1,18 @@
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-import cartopy.feature as cfeature
+"""Cartopy map helpers for Gulf of Mexico example plots."""
+
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import matplotlib.pyplot as plt
+from cartopy.mpl.ticker import LatitudeFormatter, LongitudeFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def gom_map(ax):
-    """
-    Create a map of the Gulf of Mexico with clean axis, coastline, and land
+    """Configure a cartopy axis as a Gulf of Mexico map.
+
     Args:
-        ax: matplotlib axis
+        ax: matplotlib cartopy axis
+
     """
     ax.add_feature(cfeature.LAND, facecolor="grey", zorder=1)
     ax.add_feature(cfeature.COASTLINE, linewidth=0.1, zorder=1)
@@ -23,7 +26,7 @@ def gom_map(ax):
 
 
 def add_colorbar(fig, ax, var, fmt=None, range_limit=None):
-    """Colorbar position and format properly"""
+    """Add a right-side colorbar sized to match the axes."""
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="3%", pad=0.02, axes_class=plt.Axes)
     cb = fig.colorbar(var, cax=cax, format=fmt)
